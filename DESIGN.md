@@ -11,7 +11,7 @@ A self-hosted, Docker-based file browser backed by Cloudflare R2 storage. Provid
 | Layer | Choice |
 |---|---|
 | Frontend | React + Vite (TypeScript) |
-| Backend | Go + Gin |
+| Backend | Go + Chi |
 | Auth | JWT (bcrypt password hashing) |
 | Object Storage | Cloudflare R2 (via `aws-sdk-go-v2`, S3-compatible API) |
 | Database | SQLite (users table only) |
@@ -152,14 +152,31 @@ Single `docker-compose.yml` spins up:
 - `backend` — Go API server, also serves built React frontend as static files
 - `litestream` — sidecar for DB backup (or bundled into backend container)
 
-Environment variables (via `.env` file):
+No local S3 emulator needed — both dev and production point at real Cloudflare R2. Use two separate buckets:
+- `opendrive-dev` — for local development
+- `opendrive` — for production
 
+Switching environments is purely an env var swap.
+
+**.env.dev** (development bucket)
 ```
-R2_ACCOUNT_ID=
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
-R2_BUCKET=
-R2_ENDPOINT=
+R2_BUCKET=opendrive-dev
+R2_REGION=auto
+
+JWT_SECRET=dev-secret
+DB_PATH=/data/opendrive.db
+```
+
+**.env** (production bucket)
+```
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=opendrive
+R2_REGION=auto
 
 JWT_SECRET=
 DB_PATH=/data/opendrive.db
