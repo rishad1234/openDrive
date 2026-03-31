@@ -1,0 +1,24 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Go
+server/data/
+server/tmp/
+
+# React / Node
+client/node_modules/
+client/dist/
+client/.env
+client/.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
