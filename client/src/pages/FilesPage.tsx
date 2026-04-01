@@ -33,6 +33,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { notifications } from '@mantine/notifications'
 import { fsApi, type FsEntry } from '../api/fs'
+import { adminApi } from '../api/admin'
 import { useAuthStore } from '../store/auth'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -152,9 +153,14 @@ function RenameModal({
 }
 
 function DeleteConfirm({
-  item, onClose,
-}: { item: { key: string; name: string; isFolder: boolean } | null; onClose: () => void }) {
+  item, onClose, isAdmin,
+}: { item: { key: string; name: string; isFolder: boolean } | null; onClose: () => void; isAdmin?: boolean }) {
   const qc = useQueryClient()
+  const [step, setStep] = useState<1 | 2>(1)
+
+  useEffect(() => {
+    if (item) setStep(1)
+  }, [item])
 
   const mutation = useMutation({
     mutationFn: () => fsApi.delete(item!.key),
@@ -166,18 +172,68 @@ function DeleteConfirm({
     onError: () => notifications.show({ color: 'red', message: 'Failed to delete.' }),
   })
 
+  // Regular users: simple one-step confirm
+  if (!isAdmin) {
+    return (
+      <Modal opened={!!item} onClose={onClose} title="Confirm delete" size="sm">
+        <Text size="sm" mb="lg">
+          {item?.isFolder
+            ? <>Delete folder <strong>{item.name}</strong> and all its contents? This cannot be undone.</>
+            : <>Delete <strong>{item?.name}</strong>? This cannot be undone.</>
+          }
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>Cancel</Button>
+          <Button color="red" loading={mutation.isPending} onClick={() => mutation.mutate()}>Delete</Button>
+        </Group>
+      </Modal>
+    )
+  }
+
+  // Admins: two-step confirm
   return (
-    <Modal opened={!!item} onClose={onClose} title="Confirm delete" size="sm">
-      <Text size="sm" mb="lg">
-        {item?.isFolder
-          ? <>Delete folder <strong>{item.name}</strong> and all its contents? This cannot be undone.</>
-          : <>Delete <strong>{item?.name}</strong>? This cannot be undone.</>
-        }
-      </Text>
-      <Group justify="flex-end">
-        <Button variant="default" onClick={onClose}>Cancel</Button>
-        <Button color="red" loading={mutation.isPending} onClick={() => mutation.mutate()}>Delete</Button>
-      </Group>
+    <Modal
+      opened={!!item}
+      onClose={onClose}
+      title={step === 1 ? 'Delete confirmation — step 1 of 2' : 'Delete confirmation — step 2 of 2'}
+      size="sm"
+    >
+      {step === 1 ? (
+        <Stack>
+          <Text size="sm">
+            You are about to permanently delete{' '}
+            {item?.isFolder
+              ? <><strong>{item.name}</strong> and <em>all of its contents</em></>
+              : <strong>{item?.name}</strong>
+            }.
+          </Text>
+          <Text size="sm" c="dimmed">
+            As an admin you are deleting on behalf of a user. This action cannot be undone.
+          </Text>
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={onClose}>Cancel</Button>
+            <Button color="orange" onClick={() => setStep(2)}>I understand, continue</Button>
+          </Group>
+        </Stack>
+      ) : (
+        <Stack>
+          <Text size="sm" fw={600} c="red">Final confirmation</Text>
+          <Text size="sm">
+            Permanently delete{' '}
+            {item?.isFolder
+              ? <><strong>{item.name}</strong> and all its contents</>
+              : <strong>{item?.name}</strong>
+            }?
+            {' '}There is no recovery.
+          </Text>
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => setStep(1)}>Go back</Button>
+            <Button color="red" loading={mutation.isPending} onClick={() => mutation.mutate()}>
+              Delete permanently
+            </Button>
+          </Group>
+        </Stack>
+      )}
     </Modal>
   )
 }
@@ -186,8 +242,18 @@ function DeleteConfirm({
 
 export function FilesPage() {
   const user = useAuthStore((s) => s.user)
-  const userRoot = `users/${user!.id}/`
+  const isAdmin = user?.role === 'admin'
+  const userRoot = isAdmin ? 'users/' : `users/${user!.id}/`
   const { '*': pathParam = '' } = useParams()
+
+  // Admin: fetch all users to map id → username for folder labels
+  const { data: allUsers } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => adminApi.listUsers(),
+    enabled: isAdmin,
+    staleTime: 60_000,
+  })
+  const userNameMap = Object.fromEntries((allUsers ?? []).map((u) => [u.id, u.username]))
   const navigate = useNavigate()
   const qc = useQueryClient()
 
@@ -285,7 +351,7 @@ export function FilesPage() {
       <Group justify="space-between" mb="md" wrap="nowrap">
         <Breadcrumbs>
           <Anchor size="sm" onClick={() => navigate('/files')} style={{ cursor: 'pointer' }}>
-            My Files
+            {isAdmin ? 'All Files' : 'My Files'}
           </Anchor>
           {segments.map((seg, i) => {
             const path = segments.slice(0, i + 1).join('/')
@@ -387,7 +453,11 @@ export function FilesPage() {
                         c="inherit"
                         fw={500}
                       >
-                        {folderName(prefix)}
+                        {(() => {
+                          const id = folderName(prefix)
+                          const name = isAdmin && currentPrefix === 'users/' ? userNameMap[id] : undefined
+                          return name ? <>{id} <Text span size="sm" c="dimmed">({name})</Text></> : id
+                        })()}
                       </Anchor>
                     </Group>
                   </Table.Td>
@@ -456,7 +526,7 @@ export function FilesPage() {
         currentPrefix={currentPrefix}
       />
       <RenameModal file={renaming} onClose={() => setRenaming(null)} />
-      <DeleteConfirm item={deleting} onClose={() => setDeleting(null)} />
+      <DeleteConfirm item={deleting} onClose={() => setDeleting(null)} isAdmin={isAdmin} />
     </Box>
   )
 }
