@@ -2,7 +2,9 @@ package user
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rishad/opendrive/server/internal/dto"
@@ -11,6 +13,28 @@ import (
 	"github.com/rishad/opendrive/server/internal/middleware"
 	"golang.org/x/crypto/bcrypt"
 )
+
+var (
+	reUppercase = regexp.MustCompile(`[A-Z]`)
+	reLowercase = regexp.MustCompile(`[a-z]`)
+	reDigit     = regexp.MustCompile(`[0-9]`)
+)
+
+func validatePasswordPolicy(pw string) error {
+	if len(pw) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+	if !reUppercase.MatchString(pw) {
+		return fmt.Errorf("password must contain at least one uppercase letter")
+	}
+	if !reLowercase.MatchString(pw) {
+		return fmt.Errorf("password must contain at least one lowercase letter")
+	}
+	if !reDigit.MatchString(pw) {
+		return fmt.Errorf("password must contain at least one number")
+	}
+	return nil
+}
 
 type Handler struct {
 	mapper *mapper.UserMapper
@@ -44,6 +68,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Username == "" || req.Password == "" {
 		http.Error(w, "username and password required", http.StatusBadRequest)
+		return
+	}
+	if err := validatePasswordPolicy(req.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if req.Role != entities.RoleAdmin && req.Role != entities.RoleUser {
@@ -86,6 +114,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Password != "" {
+		if err := validatePasswordPolicy(req.Password); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	if err := h.mapper.Update(id, req.Password, req.Role, req.Email); err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -110,8 +145,12 @@ func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If changing password, verify current password first
+	// If changing password, enforce policy then verify current password
 	if req.Password != "" {
+		if err := validatePasswordPolicy(req.Password); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if req.CurrentPassword == "" {
 			http.Error(w, "current password required to set a new password", http.StatusBadRequest)
 			return

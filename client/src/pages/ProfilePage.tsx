@@ -15,6 +15,7 @@ import { notifications } from '@mantine/notifications'
 import { useMutation } from '@tanstack/react-query'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../store/auth'
+import { validatePassword } from '../utils/password'
 
 export function ProfilePage() {
   const { user, setAuth } = useAuthStore()
@@ -25,6 +26,7 @@ export function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const newPasswordError = newPassword ? validatePassword(newPassword) : null
 
   useEffect(() => {
     setUsername(user?.username ?? '')
@@ -50,6 +52,11 @@ export function ProfilePage() {
 
     if (newPassword && newPassword !== confirmPassword) {
       notifications.show({ color: 'red', message: 'New passwords do not match.' })
+      return
+    }
+
+    if (newPassword && newPasswordError) {
+      notifications.show({ color: 'red', message: newPasswordError })
       return
     }
 
@@ -118,6 +125,8 @@ export function ProfilePage() {
             value={newPassword}
             onChange={(e) => setNewPassword(e.currentTarget.value)}
             autoComplete="new-password"
+            error={newPasswordError}
+            description="Min 8 chars, upper & lowercase letter, and a number"
           />
           <PasswordInput
             label="Confirm new password"

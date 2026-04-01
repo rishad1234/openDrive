@@ -21,6 +21,7 @@ import { notifications } from '@mantine/notifications'
 import { adminApi, type CreateUserRequest, type UpdateUserRequest } from '../api/admin'
 import type { AuthUser } from '../store/auth'
 import { useAuthStore } from '../store/auth'
+import { validatePassword } from '../utils/password'
 
 interface UserFormValues {
   username: string
@@ -49,6 +50,7 @@ function UserModal({
   const [form, setForm] = useState<UserFormValues>(emptyForm)
 
   const isEdit = editing !== null
+  const pwError = form.password ? validatePassword(form.password) : null
 
   useEffect(() => {
     if (!opened) return
@@ -87,11 +89,16 @@ function UserModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (isEdit) {
+      if (form.password) {
+        if (pwError) return
+      }
       const payload: UpdateUserRequest = { role: form.role }
       if (form.password) payload.password = form.password
       if (form.email) payload.email = form.email
       updateMutation.mutate(payload)
     } else {
+      const err = validatePassword(form.password)
+      if (err) return
       const payload: CreateUserRequest = {
         username: form.username,
         password: form.password,
@@ -129,6 +136,8 @@ function UserModal({
             value={form.password}
             onChange={(e) => set('password')(e.currentTarget.value)}
             required={!isEdit}
+            error={pwError}
+            description="Min 8 chars, upper & lowercase letter, and a number"
           />
           <Select
             label="Role"
