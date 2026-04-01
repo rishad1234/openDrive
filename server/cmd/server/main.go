@@ -61,6 +61,7 @@ func main() {
 
 		r.Get("/api/auth/me", authHandler.Me)
 		r.Post("/api/auth/logout", authHandler.Logout)
+		r.Patch("/api/user/profile", userHandler.Profile)
 
 		r.Get("/api/fs/list", fsHandler.List)
 		r.Post("/api/fs/upload", fsHandler.Upload)

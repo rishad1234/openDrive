@@ -105,14 +105,23 @@ type meResponse struct {
 	ID       string        `json:"id"`
 	Username string        `json:"username"`
 	Role     entities.Role `json:"role"`
+	Email    *string       `json:"email,omitempty"`
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r)
+
+	u, err := h.userMapper.GetByID(claims.UserID)
+	if err != nil || u == nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(meResponse{
-		ID:       claims.UserID,
-		Username: claims.Username,
-		Role:     claims.Role,
+		ID:       u.ID,
+		Username: u.Username,
+		Role:     u.Role,
+		Email:    u.Email,
 	})
 }

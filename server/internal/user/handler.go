@@ -8,6 +8,8 @@ import (
 	"github.com/rishad/opendrive/server/internal/dto"
 	"github.com/rishad/opendrive/server/internal/entities"
 	"github.com/rishad/opendrive/server/internal/mapper"
+	"github.com/rishad/opendrive/server/internal/middleware"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
@@ -90,4 +92,52 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type updateProfileRequest struct {
+	Username        string  `json:"username"`
+	CurrentPassword string  `json:"current_password"`
+	Password        string  `json:"password"`
+	Email           *string `json:"email"`
+}
+
+func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetClaims(r)
+
+	var req updateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// If changing password, verify current password first
+	if req.Password != "" {
+		if req.CurrentPassword == "" {
+			http.Error(w, "current password required to set a new password", http.StatusBadRequest)
+			return
+		}
+		current, err := h.mapper.GetByIDWithPassword(claims.UserID)
+		if err != nil || current == nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(current.Password), []byte(req.CurrentPassword)); err != nil {
+			http.Error(w, "current password is incorrect", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	if err := h.mapper.UpdateSelf(claims.UserID, req.Username, req.Password, req.Email); err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	u, err := h.mapper.GetByID(claims.UserID)
+	if err != nil || u == nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(dto.UserFromEntity(*u))
 }

@@ -76,6 +76,24 @@ func (m *UserMapper) GetByID(id string) (*entities.User, error) {
 	return &u, nil
 }
 
+func (m *UserMapper) GetByIDWithPassword(id string) (*entities.User, error) {
+	var u entities.User
+	var email sql.NullString
+	err := m.db.QueryRow(
+		"SELECT id, username, password, role, created_at, email FROM users WHERE id = ?", id,
+	).Scan(&u.ID, &u.Username, &u.Password, &u.Role, &u.CreatedAt, &email)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query user by id with password: %w", err)
+	}
+	if email.Valid {
+		u.Email = &email.String
+	}
+	return &u, nil
+}
+
 func (m *UserMapper) Create(username, password string, role entities.Role, email *string) (*entities.User, error) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -92,6 +110,32 @@ func (m *UserMapper) Create(username, password string, role entities.Role, email
 	}
 
 	return &entities.User{ID: id, Username: username, Role: entities.Role(role), Email: email}, nil
+}
+
+func (m *UserMapper) UpdateSelf(id, username, password string, email *string) error {
+	if username != "" {
+		if _, err := m.db.Exec("UPDATE users SET username = ? WHERE id = ?", username, id); err != nil {
+			return fmt.Errorf("update username: %w", err)
+		}
+	}
+
+	if password != "" {
+		hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("hash password: %w", err)
+		}
+		if _, err := m.db.Exec("UPDATE users SET password = ? WHERE id = ?", string(hashed), id); err != nil {
+			return fmt.Errorf("update password: %w", err)
+		}
+	}
+
+	if email != nil {
+		if _, err := m.db.Exec("UPDATE users SET email = ? WHERE id = ?", email, id); err != nil {
+			return fmt.Errorf("update email: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (m *UserMapper) Update(id, password string, role entities.Role, email *string) error {
