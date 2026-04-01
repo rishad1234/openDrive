@@ -28,6 +28,7 @@ import {
   IconPlus,
   IconUpload,
   IconFolderOpen,
+  IconRefresh,
 } from '@tabler/icons-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { notifications } from '@mantine/notifications'
@@ -52,6 +53,35 @@ function formatDate(iso: string): string {
 function folderName(prefix: string): string {
   const parts = prefix.split('/').filter(Boolean)
   return parts[parts.length - 1] ?? prefix
+}
+
+function fileIconColor(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  if (['jpg','jpeg','png','gif','webp','svg','ico','bmp','heic'].includes(ext)) return 'green'
+  if (['mp4','mov','avi','mkv','webm','m4v'].includes(ext)) return 'grape'
+  if (['mp3','wav','flac','aac','ogg','m4a'].includes(ext)) return 'teal'
+  if (['pdf'].includes(ext)) return 'red'
+  if (['doc','docx','txt','md','rtf','odt'].includes(ext)) return 'blue'
+  if (['xls','xlsx','csv','ods'].includes(ext)) return 'lime'
+  if (['zip','tar','gz','rar','7z','bz2'].includes(ext)) return 'orange'
+  if (['js','ts','jsx','tsx','go','py','rs','java','c','cpp','h','rb','php'].includes(ext)) return 'violet'
+  return 'gray'
+}
+
+// ── hover row ────────────────────────────────────────────────────────────────
+
+function HoverRow({ children, actions }: { children: React.ReactNode; actions: React.ReactNode }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <Table.Tr onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      {children}
+      <Table.Td>
+        <Group gap={4} justify="flex-end" wrap="nowrap" style={{ opacity: hovered ? 1 : 0, transition: 'opacity 140ms ease' }}>
+          {actions}
+        </Group>
+      </Table.Td>
+    </Table.Tr>
+  )
 }
 
 // ── modals ───────────────────────────────────────────────────────────────────
@@ -245,6 +275,7 @@ export function FilesPage() {
   const isAdmin = user?.role === 'admin'
   const { currentPrefix, userRoot, handleUpload, uploadState } = useFilesUpload()
   const { '*': pathParam = '' } = useParams()
+  const qc = useQueryClient()
 
   // Admin: fetch all users to map id → username for folder labels
   const { data: allUsers } = useQuery({
@@ -288,22 +319,36 @@ export function FilesPage() {
     <>
       {/* Toolbar */}
       <Group justify="space-between" mb="md" wrap="nowrap">
-        <Breadcrumbs>
-          <Anchor size="sm" onClick={() => navigate('/files')} style={{ cursor: 'pointer' }}>
-            {isAdmin ? 'All Files' : 'My Files'}
-          </Anchor>
-          {segments.map((seg, i) => {
-            const path = segments.slice(0, i + 1).join('/')
-            const isLast = i === segments.length - 1
-            return isLast ? (
-              <Text key={seg} size="sm">{seg}</Text>
-            ) : (
-              <Anchor key={seg} size="sm" onClick={() => navigate(`/files/${path}`)} style={{ cursor: 'pointer' }}>
-                {seg}
-              </Anchor>
-            )
-          })}
-        </Breadcrumbs>
+        <Group gap={4} align="center">
+          <Breadcrumbs>
+            <Anchor size="sm" onClick={() => navigate('/files')} style={{ cursor: 'pointer' }}>
+              {isAdmin ? 'All Files' : 'My Files'}
+            </Anchor>
+            {segments.map((seg, i) => {
+              const path = segments.slice(0, i + 1).join('/')
+              const isLast = i === segments.length - 1
+              return isLast ? (
+                <Text key={seg} size="sm">{seg}</Text>
+              ) : (
+                <Anchor key={seg} size="sm" onClick={() => navigate(`/files/${path}`)} style={{ cursor: 'pointer' }}>
+                  {seg}
+                </Anchor>
+              )
+            })}
+          </Breadcrumbs>
+          <Tooltip label="Refresh" position="bottom">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="md"
+              loading={isLoading}
+              onClick={() => qc.invalidateQueries({ queryKey: ['files', currentPrefix] })}
+              aria-label="Refresh"
+            >
+              <IconRefresh size={15} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
 
         <Group gap="xs">
           <Button
@@ -381,10 +426,23 @@ export function FilesPage() {
             <Table.Tbody>
               {/* Folders */}
               {data?.folders.map((prefix) => (
-                <Table.Tr key={prefix} style={{ cursor: 'pointer' }}>
+                <HoverRow
+                  key={prefix}
+                  actions={
+                    <Tooltip label="Delete folder" position="left">
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={() => setDeleting({ key: prefix, name: folderName(prefix), isFolder: true })}
+                      >
+                        <IconTrash size={15} />
+                      </ActionIcon>
+                    </Tooltip>
+                  }
+                >
                   <Table.Td>
                     <Group gap="xs" wrap="nowrap">
-                      <IconFolder size={16} style={{ flexShrink: 0 }} />
+                      <IconFolder size={16} style={{ color: 'var(--mantine-color-yellow-5)', flexShrink: 0 }} />
                       <Anchor
                         size="sm"
                         onDoubleClick={() => navigateTo(prefix)}
@@ -403,35 +461,15 @@ export function FilesPage() {
                   </Table.Td>
                   <Table.Td><Text size="sm" c="dimmed">—</Text></Table.Td>
                   <Table.Td><Text size="sm" c="dimmed">—</Text></Table.Td>
-                  <Table.Td>
-                    <Group gap={4} justify="flex-end">
-                      <Tooltip label="Delete folder" position="left">
-                        <ActionIcon
-                          variant="subtle"
-                          color="red"
-                          onClick={() => setDeleting({ key: prefix, name: folderName(prefix), isFolder: true })}
-                        >
-                          <IconTrash size={15} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
+                </HoverRow>
               ))}
 
               {/* Files */}
               {data?.files.map((file) => (
-                <Table.Tr key={file.key} style={{ cursor: 'pointer' }}>
-                  <Table.Td>
-                    <Group gap="xs" wrap="nowrap">
-                      <IconFile size={16} style={{ flexShrink: 0 }} />
-                      <Text size="sm">{file.name}</Text>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td><Text size="sm">{formatSize(file.size)}</Text></Table.Td>
-                  <Table.Td><Text size="sm">{formatDate(file.last_modified)}</Text></Table.Td>
-                  <Table.Td>
-                    <Group gap={4} justify="flex-end" wrap="nowrap">
+                <HoverRow
+                  key={file.key}
+                  actions={
+                    <>
                       <Tooltip label="Download" position="left">
                         <ActionIcon variant="subtle" color="gray" onClick={() => handleDownload(file)}>
                           <IconDownload size={15} />
@@ -451,9 +489,18 @@ export function FilesPage() {
                           <IconTrash size={15} />
                         </ActionIcon>
                       </Tooltip>
+                    </>
+                  }
+                >
+                  <Table.Td>
+                    <Group gap="xs" wrap="nowrap">
+                      <IconFile size={16} style={{ color: `var(--mantine-color-${fileIconColor(file.name)}-5)`, flexShrink: 0 }} />
+                      <Text size="sm">{file.name}</Text>
                     </Group>
                   </Table.Td>
-                </Table.Tr>
+                  <Table.Td><Text size="sm">{formatSize(file.size)}</Text></Table.Td>
+                  <Table.Td><Text size="sm">{formatDate(file.last_modified)}</Text></Table.Td>
+                </HoverRow>
               ))}
             </Table.Tbody>
           </Table>

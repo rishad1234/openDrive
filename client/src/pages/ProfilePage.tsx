@@ -10,6 +10,7 @@ import {
   Text,
   Group,
   Badge,
+  Paper,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { useMutation } from '@tanstack/react-query'
@@ -84,15 +85,16 @@ export function ProfilePage() {
 
   return (
     <Box maw={480}>
-      <Group mb="md" align="center" gap="sm">
+      <Group mb="lg" align="center" gap="sm">
         <Title order={4}>Profile</Title>
         <Badge variant="light" color={user?.role === 'admin' ? 'blue' : 'gray'} size="sm">
           {user?.role}
         </Badge>
       </Group>
 
-      <form onSubmit={handleSubmit}>
-        <Stack>
+      <Paper withBorder p="xl" radius="md">
+        <form onSubmit={handleSubmit}>
+          <Stack>
           <TextInput
             label="Username"
             value={username}
@@ -141,6 +143,7 @@ export function ProfilePage() {
           </Button>
         </Stack>
       </form>
+      </Paper>
     </Box>
   )
 }
