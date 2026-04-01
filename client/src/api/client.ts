@@ -1,24 +1,32 @@
 import { useAuthStore } from '../store/auth'
 
+interface ApiFetchOptions extends RequestInit {
+  skipRedirectOn401?: boolean
+}
+
 export async function apiFetch<T>(
   path: string,
-  init: RequestInit = {},
+  init: ApiFetchOptions = {},
 ): Promise<T> {
+  const { skipRedirectOn401, ...fetchInit } = init
   const token = useAuthStore.getState().token
 
   const res = await fetch(path, {
-    ...init,
+    ...fetchInit,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init.headers,
+      ...fetchInit.headers,
     },
   })
 
   if (res.status === 401) {
-    useAuthStore.getState().clearAuth()
-    window.location.href = '/login'
-    throw new Error('unauthorized')
+    if (!skipRedirectOn401) {
+      useAuthStore.getState().clearAuth()
+      window.location.href = '/login'
+    }
+    const text = await res.text()
+    throw new Error(text || 'unauthorized')
   }
 
   if (!res.ok) {

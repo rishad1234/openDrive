@@ -4,6 +4,7 @@ import { Center, Loader } from '@mantine/core'
 import { LoginPage } from './pages/LoginPage'
 import { FilesPage } from './pages/FilesPage'
 import { AdminPage } from './pages/AdminPage'
+import { ProfilePage } from './pages/ProfilePage'
 import { AppLayout } from './components/AppLayout'
 import { useAuthStore } from './store/auth'
 import { authApi } from './api/auth'
@@ -66,6 +67,14 @@ export function Router() {
             <RequireAdmin>
               <AdminPage />
             </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <RequireAuth>
+            <ProfilePage />
           </RequireAuth>
         }
       />
