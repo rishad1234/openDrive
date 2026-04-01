@@ -6,6 +6,7 @@ import { FilesPage } from './pages/FilesPage'
 import { AdminPage } from './pages/AdminPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { AppLayout } from './components/AppLayout'
+import { FilesLayout } from './components/FilesLayout'
 import { useAuthStore } from './store/auth'
 import { authApi } from './api/auth'
 
@@ -56,7 +57,9 @@ export function Router() {
         path="/files/*"
         element={
           <RequireAuth>
-            <FilesPage />
+            <FilesLayout>
+              <FilesPage />
+            </FilesLayout>
           </RequireAuth>
         }
       />

@@ -7,7 +7,6 @@ import {
   ActionIcon,
   Tooltip,
   Text,
-  Box,
   Breadcrumbs,
   Anchor,
   Modal,
@@ -17,8 +16,8 @@ import {
   Loader,
   ThemeIcon,
   ScrollArea,
-  Progress,
   Paper,
+  Progress,
 } from '@mantine/core'
 import {
   IconFolder,
@@ -35,6 +34,7 @@ import { notifications } from '@mantine/notifications'
 import { fsApi, type FsEntry } from '../api/fs'
 import { adminApi } from '../api/admin'
 import { useAuthStore } from '../store/auth'
+import { useFilesUpload } from '../components/FilesLayout'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -243,7 +243,7 @@ function DeleteConfirm({
 export function FilesPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'admin'
-  const userRoot = isAdmin ? 'users/' : `users/${user!.id}/`
+  const { currentPrefix, userRoot, handleUpload, uploadState } = useFilesUpload()
   const { '*': pathParam = '' } = useParams()
 
   // Admin: fetch all users to map id → username for folder labels
@@ -255,12 +255,6 @@ export function FilesPage() {
   })
   const userNameMap = Object.fromEntries((allUsers ?? []).map((u) => [u.id, u.username]))
   const navigate = useNavigate()
-  const qc = useQueryClient()
-
-  // Compute R2 prefix from URL path
-  const currentPrefix = pathParam
-    ? `${userRoot}${pathParam.endsWith('/') ? pathParam : pathParam + '/'}`
-    : userRoot
 
   // Breadcrumb segments
   const segments = pathParam ? pathParam.split('/').filter(Boolean) : []
@@ -273,66 +267,11 @@ export function FilesPage() {
   const [newFolderOpen, setNewFolderOpen] = useState(false)
   const [renaming, setRenaming] = useState<FsEntry | null>(null)
   const [deleting, setDeleting] = useState<{ key: string; name: string; isFolder: boolean } | null>(null)
-  const [uploadState, setUploadState] = useState<{
-    active: boolean
-    fileName: string
-    fileIndex: number
-    total: number
-    pct: number
-  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const isUploading = !!uploadState
-
-  // Block tab close / reload while uploading
-  useEffect(() => {
-    if (!isUploading) return
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-    }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [isUploading])
 
   const navigateTo = (folderPrefix: string) => {
     const rel = folderPrefix.slice(userRoot.length).replace(/\/$/, '')
     navigate(`/files/${rel}`)
-  }
-
-  const handleUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-
-    const MAX_SIZE = 1 * 1024 * 1024 * 1024 // 1 GB
-    const fileArray = Array.from(files)
-    const oversized = fileArray.filter((f) => f.size > MAX_SIZE)
-    if (oversized.length > 0) {
-      notifications.show({
-        color: 'red',
-        title: 'File too large',
-        message: `${oversized.map((f) => f.name).join(', ')} exceed${oversized.length === 1 ? 's' : ''} the 1 GB limit.`,
-      })
-      return
-    }
-    let failed = 0
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i]
-      setUploadState({ active: true, fileName: file.name, fileIndex: i + 1, total: fileArray.length, pct: 0 })
-      try {
-        const res = await fsApi.upload(currentPrefix, file, (pct) => {
-          setUploadState((s) => s ? { ...s, pct } : s)
-        })
-        if (!res.ok) failed++
-      } catch {
-        failed++
-      }
-    }
-    setUploadState(null)
-    qc.invalidateQueries({ queryKey: ['files'] })
-    if (failed > 0) {
-      notifications.show({ color: 'red', message: `${failed} file(s) failed to upload.` })
-    } else {
-      notifications.show({ color: 'green', message: `${fileArray.length} file(s) uploaded.` })
-    }
   }
 
   const handleDownload = async (file: FsEntry) => {
@@ -346,7 +285,7 @@ export function FilesPage() {
   const isEmpty = !isLoading && (data?.folders.length ?? 0) === 0 && (data?.files.length ?? 0) === 0
 
   return (
-    <Box>
+    <>
       {/* Toolbar */}
       <Group justify="space-between" mb="md" wrap="nowrap">
         <Breadcrumbs>
@@ -388,7 +327,7 @@ export function FilesPage() {
             type="file"
             multiple
             style={{ display: 'none' }}
-            onChange={(e) => handleUpload(e.target.files)}
+            onChange={(e) => handleUpload(Array.from(e.target.files ?? []))}
             onClick={(e) => { (e.target as HTMLInputElement).value = '' }}
           />
         </Group>
@@ -417,6 +356,7 @@ export function FilesPage() {
               <IconFolderOpen size={24} />
             </ThemeIcon>
             <Text size="sm" c="dimmed">This folder is empty</Text>
+            <Text size="xs" c="dimmed">Drag files here or use the buttons above</Text>
             <Group gap="xs">
               <Button size="xs" variant="light" onClick={() => setNewFolderOpen(true)}>
                 New folder
@@ -527,7 +467,7 @@ export function FilesPage() {
       />
       <RenameModal file={renaming} onClose={() => setRenaming(null)} />
       <DeleteConfirm item={deleting} onClose={() => setDeleting(null)} isAdmin={isAdmin} />
-    </Box>
+    </>
   )
 }
 
