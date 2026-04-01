@@ -107,15 +107,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
-	requestedPrefix := r.URL.Query().Get("prefix")
-	prefix, err := h.userPrefix(r, requestedPrefix)
+	const maxFileSize = 1 << 30 // 1 GB
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxFileSize)
+
+	requestPrefix := r.URL.Query().Get("prefix")
+	prefix, err := h.userPrefix(r, requestPrefix)
 	if err != nil {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		http.Error(w, "failed to parse form", http.StatusBadRequest)
+		http.Error(w, "file exceeds the 1 GB limit", http.StatusRequestEntityTooLarge)
 		return
 	}
 
@@ -125,6 +129,11 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
+	if header.Size > maxFileSize {
+		http.Error(w, "file exceeds the 1 GB limit", http.StatusRequestEntityTooLarge)
+		return
+	}
 
 	key := prefix + header.Filename
 
