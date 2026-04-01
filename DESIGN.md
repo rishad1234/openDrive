@@ -24,7 +24,7 @@ A self-hosted, Docker-based file browser backed by Cloudflare R2 storage. Provid
 
 ```
 openDrive/
-├── backend/              # Go + Gin API server
+├── server/               # Go + Chi API server
 │   ├── cmd/
 │   ├── internal/
 │   │   ├── auth/
@@ -32,7 +32,7 @@ openDrive/
 │   │   └── user/
 │   ├── db/               # SQLite + migrations
 │   └── Dockerfile
-├── frontend/             # React + Vite SPA
+├── client/               # React + Vite SPA
 │   └── Dockerfile
 ├── docker-compose.yml
 ├── litestream.yml        # Litestream backup config
@@ -149,7 +149,7 @@ On container restart, Litestream restores the DB from R2 if no local DB is found
 ## Docker Compose (Planned)
 
 Single `docker-compose.yml` spins up:
-- `backend` — Go API server, also serves built React frontend as static files
+- `server` — Go API server, also serves built React frontend as static files
 - `litestream` — sidecar for DB backup (or bundled into backend container)
 
 No local S3 emulator needed — both dev and production point at real Cloudflare R2. Use two separate buckets:

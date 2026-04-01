@@ -10,8 +10,9 @@ import {
   Center,
   Stack,
   Box,
+  Alert,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { IconAlertCircle } from '@tabler/icons-react'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../store/auth'
 
@@ -19,25 +20,22 @@ export function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const { setAuth } = useAuthStore()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     setLoading(true)
     try {
       const { token } = await authApi.login(username, password)
-      // Set token so subsequent apiFetch calls attach it
       useAuthStore.setState({ token })
       const user = await authApi.me()
       setAuth(token, user)
       navigate('/files', { replace: true })
     } catch {
-      notifications.show({
-        color: 'red',
-        title: 'Login failed',
-        message: 'Invalid username or password.',
-      })
+      setError('Invalid username or password.')
     } finally {
       setLoading(false)
     }
@@ -56,6 +54,16 @@ export function LoginPage() {
         <Paper withBorder p="xl" radius="md">
           <form onSubmit={handleSubmit}>
             <Stack>
+              {error && (
+                <Alert
+                  icon={<IconAlertCircle size={16} />}
+                  color="red"
+                  variant="light"
+                  p="xs"
+                >
+                  {error}
+                </Alert>
+              )}
               <TextInput
                 label="Username"
                 placeholder="username"

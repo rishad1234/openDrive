@@ -10,6 +10,7 @@ export const authApi = {
     apiFetch<LoginResponse>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
+      skipRedirectOn401: true,
     }),
 
   me: () => apiFetch<AuthUser>('/api/auth/me'),
