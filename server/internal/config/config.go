@@ -10,7 +10,8 @@ type Config struct {
 
 	JWTSecret string
 
-	DBPath string
+	DBPath    string
+	StaticDir string
 
 	R2Endpoint        string
 	R2AccessKeyID     string
@@ -24,6 +25,7 @@ func Load() *Config {
 		Port:              getEnv("PORT", "3000"),
 		JWTSecret:         requireEnv("JWT_SECRET"),
 		DBPath:            getEnv("DB_PATH", "./data/opendrive.db"),
+		StaticDir:         getEnv("STATIC_DIR", ""),
 		R2Endpoint:        requireEnv("R2_ENDPOINT"),
 		R2AccessKeyID:     requireEnv("R2_ACCESS_KEY_ID"),
 		R2SecretAccessKey: requireEnv("R2_SECRET_ACCESS_KEY"),

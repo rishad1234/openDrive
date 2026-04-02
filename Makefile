@@ -1,4 +1,4 @@
-.PHONY: dev server client
+.PHONY: dev server client build up down
 
 dev:
 	@trap 'kill 0' INT; \
@@ -11,3 +11,12 @@ server:
 
 client:
 	cd client && npm run dev
+
+build:
+	podman compose build --no-cache
+
+up:
+	podman compose up
+
+down:
+	podman compose down

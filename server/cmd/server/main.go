@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -16,7 +17,7 @@ import (
 	"github.com/rishad/opendrive/server/db"
 	"github.com/rishad/opendrive/server/internal/auth"
 	"github.com/rishad/opendrive/server/internal/config"
-	"github.com/rishad/opendrive/server/internal/fs"
+	appfs "github.com/rishad/opendrive/server/internal/fs"
 	"github.com/rishad/opendrive/server/internal/mapper"
 	"github.com/rishad/opendrive/server/internal/middleware"
 	"github.com/rishad/opendrive/server/internal/user"
@@ -40,7 +41,7 @@ func main() {
 	tokenMapper := mapper.NewTokenMapper(database)
 
 	authHandler := auth.NewHandler(userMapper, tokenMapper, cfg.JWTSecret)
-	fsHandler := fs.NewHandler(s3Client, cfg.R2Bucket)
+	fsHandler := appfs.NewHandler(s3Client, cfg.R2Bucket)
 	userHandler := user.NewHandler(userMapper)
 
 	r := chi.NewRouter()
@@ -79,6 +80,29 @@ func main() {
 			r.Patch("/api/admin/users/{id}", userHandler.Update)
 		})
 	})
+
+	// Serve React SPA from STATIC_DIR if set
+	if cfg.StaticDir != "" {
+		staticFS := http.Dir(cfg.StaticDir)
+		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				http.NotFound(w, r)
+				return
+			}
+			// Try to open the file; serve index.html for unknown paths (React Router)
+			f, err := staticFS.Open(r.URL.Path)
+			if err != nil {
+				r.URL.Path = "/"
+			} else {
+				info, statErr := f.Stat()
+				_ = f.Close()
+				if statErr == nil && info.IsDir() {
+					r.URL.Path = "/"
+				}
+			}
+			http.FileServer(staticFS).ServeHTTP(w, r)
+		})
+	}
 
 	log.Printf("server listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, r); err != nil {
