@@ -12,8 +12,11 @@ server:
 client:
 	cd client && npm run dev
 
-build:
+build-no-cache:
 	podman compose build --no-cache
+
+build:
+	podman compose build
 
 up:
 	podman compose up
