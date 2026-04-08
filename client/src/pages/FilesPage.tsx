@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Table,
   Group,
   Button,
+  Checkbox,
   ActionIcon,
   Tooltip,
   Text,
@@ -35,7 +36,7 @@ import { notifications } from '@mantine/notifications'
 import { fsApi, type FsEntry } from '../api/fs'
 import { adminApi } from '../api/admin'
 import { useAuthStore } from '../store/auth'
-import { useFilesUpload } from '../components/FilesLayout'
+import { useFilesUpload, type FileWithPath } from '../components/FilesLayout'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -70,10 +71,31 @@ function fileIconColor(name: string): string {
 
 // ── hover row ────────────────────────────────────────────────────────────────
 
-function HoverRow({ children, actions }: { children: React.ReactNode; actions: React.ReactNode }) {
+function HoverRow({ children, actions, checked, hasSelection, onCheck }: {
+  children: React.ReactNode
+  actions: React.ReactNode
+  checked: boolean
+  hasSelection: boolean
+  onCheck: (e: React.MouseEvent) => void
+}) {
   const [hovered, setHovered] = useState(false)
+  const showCheckbox = hasSelection || hovered || checked
+
   return (
-    <Table.Tr onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+    <Table.Tr
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      bg={checked ? 'var(--mantine-color-blue-light)' : undefined}
+    >
+      <Table.Td style={{ width: 36 }} onClick={(e) => { e.stopPropagation(); onCheck(e) }}>
+        <Checkbox
+          checked={checked}
+          onChange={() => {}}
+          tabIndex={-1}
+          size="xs"
+          style={{ opacity: showCheckbox ? 1 : 0, transition: 'opacity 140ms ease', pointerEvents: 'none' }}
+        />
+      </Table.Td>
       {children}
       <Table.Td>
         <Group gap={4} justify="flex-end" wrap="nowrap" style={{ opacity: hovered ? 1 : 0, transition: 'opacity 140ms ease' }}>
@@ -268,12 +290,97 @@ function DeleteConfirm({
   )
 }
 
+function BulkDeleteConfirm({
+  items, onClose, isAdmin,
+}: { items: { key: string; name: string; isFolder: boolean }[]; onClose: () => void; isAdmin?: boolean }) {
+  const qc = useQueryClient()
+  const [step, setStep] = useState<1 | 2>(1)
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    if (items.length) { setStep(1); setProgress(0) }
+  }, [items])
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      for (let i = 0; i < items.length; i++) {
+        await fsApi.delete(items[i].key)
+        setProgress(i + 1)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['files'] })
+      notifications.show({ color: 'green', message: `${items.length} item${items.length > 1 ? 's' : ''} deleted.` })
+      onClose()
+    },
+    onError: () => {
+      qc.invalidateQueries({ queryKey: ['files'] })
+      notifications.show({ color: 'red', message: 'Some items failed to delete.' })
+    },
+  })
+
+  if (!isAdmin) {
+    return (
+      <Modal opened={items.length > 0} onClose={onClose} title="Confirm delete" size="sm">
+        <Text size="sm" mb="lg">
+          Delete <strong>{items.length} item{items.length > 1 ? 's' : ''}</strong>? This cannot be undone.
+        </Text>
+        {mutation.isPending && (
+          <Progress value={(progress / items.length) * 100} size="sm" mb="md" animated />
+        )}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button color="red" loading={mutation.isPending} onClick={() => mutation.mutate()}>Delete</Button>
+        </Group>
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal
+      opened={items.length > 0}
+      onClose={onClose}
+      title={step === 1 ? 'Delete confirmation — step 1 of 2' : 'Delete confirmation — step 2 of 2'}
+      size="sm"
+    >
+      {step === 1 ? (
+        <Stack>
+          <Text size="sm">
+            You are about to permanently delete <strong>{items.length} item{items.length > 1 ? 's' : ''}</strong>.
+          </Text>
+          <Text size="sm" c="dimmed">
+            As an admin you may be deleting user files. This action cannot be undone.
+          </Text>
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={onClose}>Cancel</Button>
+            <Button color="orange" onClick={() => setStep(2)}>I understand, continue</Button>
+          </Group>
+        </Stack>
+      ) : (
+        <Stack>
+          <Text size="sm" fw={600} c="red">Final confirmation</Text>
+          <Text size="sm">
+            Permanently delete <strong>{items.length} item{items.length > 1 ? 's' : ''}</strong>? There is no recovery.
+          </Text>
+          {mutation.isPending && (
+            <Progress value={(progress / items.length) * 100} size="sm" animated />
+          )}
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => setStep(1)} disabled={mutation.isPending}>Go back</Button>
+            <Button color="red" loading={mutation.isPending} onClick={() => mutation.mutate()}>Delete permanently</Button>
+          </Group>
+        </Stack>
+      )}
+    </Modal>
+  )
+}
+
 // ── main page ────────────────────────────────────────────────────────────────
 
 export function FilesPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'admin'
-  const { currentPrefix, userRoot, handleUpload, uploadState } = useFilesUpload()
+  const { currentPrefix, userRoot, handleUpload, handleFolderUpload, uploadState } = useFilesUpload()
   const { '*': pathParam = '' } = useParams()
   const qc = useQueryClient()
 
@@ -299,6 +406,65 @@ export function FilesPage() {
   const [renaming, setRenaming] = useState<FsEntry | null>(null)
   const [deleting, setDeleting] = useState<{ key: string; name: string; isFolder: boolean } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
+
+  // ── selection ──────────────────────────────────────────────────────────────
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const lastClickedRef = useRef<string | null>(null)
+  const [bulkDeleting, setBulkDeleting] = useState<{ key: string; name: string; isFolder: boolean }[]>([])
+
+  const allItems = useMemo(() => {
+    const items: { key: string; name: string; isFolder: boolean }[] = []
+    for (const prefix of data?.folders ?? []) {
+      items.push({ key: prefix, name: folderName(prefix), isFolder: true })
+    }
+    for (const file of data?.files ?? []) {
+      items.push({ key: file.key, name: file.name, isFolder: false })
+    }
+    return items
+  }, [data])
+
+  const hasSelection = selected.size > 0
+
+  const toggleSelect = useCallback((key: string, e: React.MouseEvent) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (e.shiftKey && lastClickedRef.current) {
+        const allKeys = allItems.map((i) => i.key)
+        const lastIdx = allKeys.indexOf(lastClickedRef.current)
+        const curIdx = allKeys.indexOf(key)
+        if (lastIdx !== -1 && curIdx !== -1) {
+          const [start, end] = lastIdx < curIdx ? [lastIdx, curIdx] : [curIdx, lastIdx]
+          for (let i = start; i <= end; i++) next.add(allKeys[i])
+        }
+      } else {
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+      }
+      lastClickedRef.current = key
+      return next
+    })
+  }, [allItems])
+
+  const toggleSelectAll = useCallback(() => {
+    setSelected((prev) =>
+      prev.size === allItems.length ? new Set() : new Set(allItems.map((i) => i.key))
+    )
+  }, [allItems])
+
+  const handleBulkDelete = useCallback(() => {
+    setBulkDeleting(allItems.filter((i) => selected.has(i.key)))
+  }, [allItems, selected])
+
+  // Clear selection on navigation
+  useEffect(() => { setSelected(new Set()) }, [currentPrefix])
+
+  // Escape clears selection
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelected(new Set()) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
 
   const navigateTo = (folderPrefix: string) => {
     const rel = folderPrefix.slice(userRoot.length).replace(/\/$/, '')
@@ -318,6 +484,21 @@ export function FilesPage() {
   return (
     <>
       {/* Toolbar */}
+      {hasSelection ? (
+        <Group justify="space-between" mb="md" wrap="nowrap">
+          <Text size="sm">
+            {selected.size} item{selected.size > 1 ? 's' : ''} selected
+          </Text>
+          <Group gap="xs">
+            <Button size="xs" variant="default" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+            <Button size="xs" color="red" leftSection={<IconTrash size={14} />} onClick={handleBulkDelete}>
+              Delete
+            </Button>
+          </Group>
+        </Group>
+      ) : (
       <Group justify="space-between" mb="md" wrap="nowrap">
         <Group gap={4} align="center">
           <Breadcrumbs>
@@ -367,6 +548,15 @@ export function FilesPage() {
           >
             Upload
           </Button>
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconUpload size={14} />}
+            loading={!!uploadState}
+            onClick={() => folderInputRef.current?.click()}
+          >
+            Upload folder
+          </Button>
           <input
             ref={fileInputRef}
             type="file"
@@ -375,8 +565,26 @@ export function FilesPage() {
             onChange={(e) => handleUpload(Array.from(e.target.files ?? []))}
             onClick={(e) => { (e.target as HTMLInputElement).value = '' }}
           />
+          <input
+            ref={folderInputRef}
+            type="file"
+            // @ts-expect-error webkitdirectory is non-standard but widely supported
+            webkitdirectory=""
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              const entries: FileWithPath[] = files.map((f) => ({
+                file: f,
+                relativePath: (f as any).webkitRelativePath || f.name,
+              }))
+              handleFolderUpload(entries)
+            }}
+            onClick={(e) => { (e.target as HTMLInputElement).value = '' }}
+          />
         </Group>
       </Group>
+      )}
 
       {/* Upload progress */}
       {uploadState && (
@@ -413,14 +621,24 @@ export function FilesPage() {
           </Stack>
         </Center>
       ) : (
+        <>
+
         <ScrollArea>
           <Table striped highlightOnHover withTableBorder>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Name</Table.Th>
-                <Table.Th>Size</Table.Th>
-                <Table.Th>Modified</Table.Th>
-                <Table.Th />
+                <Table.Th style={{ width: 36, height: 36, verticalAlign: 'middle' }}>
+                  <Checkbox
+                    checked={allItems.length > 0 && selected.size === allItems.length}
+                    indeterminate={selected.size > 0 && selected.size < allItems.length}
+                    onChange={toggleSelectAll}
+                    size="xs"
+                  />
+                </Table.Th>
+                <Table.Th style={{ verticalAlign: 'middle' }}>Name</Table.Th>
+                <Table.Th style={{ verticalAlign: 'middle' }}>Size</Table.Th>
+                <Table.Th style={{ verticalAlign: 'middle' }}>Modified</Table.Th>
+                <Table.Th style={{ height: 36 }} />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -428,6 +646,9 @@ export function FilesPage() {
               {data?.folders.map((prefix) => (
                 <HoverRow
                   key={prefix}
+                  checked={selected.has(prefix)}
+                  hasSelection={hasSelection}
+                  onCheck={(e) => toggleSelect(prefix, e)}
                   actions={
                     <Tooltip label="Delete folder" position="left">
                       <ActionIcon
@@ -468,6 +689,9 @@ export function FilesPage() {
               {data?.files.map((file) => (
                 <HoverRow
                   key={file.key}
+                  checked={selected.has(file.key)}
+                  hasSelection={hasSelection}
+                  onCheck={(e) => toggleSelect(file.key, e)}
                   actions={
                     <>
                       <Tooltip label="Download" position="left">
@@ -505,7 +729,8 @@ export function FilesPage() {
             </Table.Tbody>
           </Table>
         </ScrollArea>
-      )}
+        </>)}
+
 
       <NewFolderModal
         opened={newFolderOpen}
@@ -514,6 +739,11 @@ export function FilesPage() {
       />
       <RenameModal file={renaming} onClose={() => setRenaming(null)} />
       <DeleteConfirm item={deleting} onClose={() => setDeleting(null)} isAdmin={isAdmin} />
+      <BulkDeleteConfirm
+        items={bulkDeleting}
+        onClose={() => { setBulkDeleting([]); setSelected(new Set()) }}
+        isAdmin={isAdmin}
+      />
     </>
   )
 }

@@ -1,5 +1,7 @@
 import { useAuthStore } from '../store/auth'
 
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
 interface ApiFetchOptions extends RequestInit {
   skipRedirectOn401?: boolean
 }
@@ -11,7 +13,7 @@ export async function apiFetch<T>(
   const { skipRedirectOn401, ...fetchInit } = init
   const token = useAuthStore.getState().token
 
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...fetchInit,
     headers: {
       'Content-Type': 'application/json',

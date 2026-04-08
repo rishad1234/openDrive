@@ -2,10 +2,14 @@
 .env
 .env.*
 !.env.example
+.dev.vars
+.password
 
-# Go
-server/data/
-server/tmp/
+# Worker
+server/node_modules/
+server/.wrangler/
+.wrangler/
+server/scripts/seed.ts
 
 # React / Node
 client/node_modules/

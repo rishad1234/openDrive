@@ -1,25 +1,28 @@
-.PHONY: dev server client build up down
+.PHONY: dev dev-remote server client deploy deploy-api deploy-ui
 
 dev:
 	@trap 'kill 0' INT; \
-	(cd server && set -a && . ./.env && set +a && go run ./cmd/server) & \
+	(cd server && npx wrangler dev --env-file .env) & \
 	(cd client && npm run dev) & \
 	wait
 
 server:
-	cd server && set -a && . ./.env && set +a && go run ./cmd/server
+	cd server && npx wrangler dev --env-file .env
 
 client:
 	cd client && npm run dev
 
-build-no-cache:
-	podman compose build --no-cache
+dev-remote:
+	cd client && VITE_API_URL=$(VITE_API_URL) npm run dev
 
-build:
-	podman compose build
+deploy: deploy-api deploy-ui
 
-up:
-	podman compose up
+deploy-api:
+	cd server && npx wrangler deploy
 
-down:
-	podman compose down
+include .env
+export
+
+deploy-ui:
+	cd client && VITE_API_URL=$(VITE_API_URL) npm run build
+	cd client && npx wrangler pages deploy dist --project-name opendrive --branch main --commit-dirty=true
