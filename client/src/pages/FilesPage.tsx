@@ -499,9 +499,9 @@ export function FilesPage() {
           </Group>
         </Group>
       ) : (
-      <Group justify="space-between" mb="md" wrap="nowrap">
-        <Group gap={4} align="center">
-          <Breadcrumbs>
+      <Group justify="space-between" mb="md" wrap="wrap">
+        <Group gap={4} align="center" wrap="nowrap" style={{ minWidth: 0 }}>
+          <Breadcrumbs style={{ overflow: 'hidden' }}>
             <Anchor size="sm" onClick={() => navigate('/files')} style={{ cursor: 'pointer' }}>
               {isAdmin ? 'All Files' : 'My Files'}
             </Anchor>
@@ -531,7 +531,7 @@ export function FilesPage() {
           </Tooltip>
         </Group>
 
-        <Group gap="xs">
+        <Group gap="xs" wrap="nowrap">
           <Button
             size="xs"
             variant="default"
@@ -624,7 +624,7 @@ export function FilesPage() {
         <>
 
         <ScrollArea>
-          <Table striped highlightOnHover withTableBorder>
+          <Table striped highlightOnHover withTableBorder style={{ minWidth: 500 }}>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th style={{ width: 36, height: 36, verticalAlign: 'middle' }}>
