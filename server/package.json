@@ -1,0 +1,26 @@
+{
+  "name": "opendrive-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env-file .env",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "wrangler d1 migrations apply opendrive-dev --local",
+    "db:seed": "tsx scripts/seed.ts > /tmp/opendrive-seed.sql && wrangler d1 execute opendrive-dev --local --file /tmp/opendrive-seed.sql"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20",
+    "bcryptjs": "^3.0.3",
+    "hono": "^4.12.11",
+    "jose": "^6.2.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260405.1",
+    "@types/bcryptjs": "^2.4.6",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "wrangler": "^4.80.0"
+  }
+}
