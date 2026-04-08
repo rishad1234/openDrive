@@ -45,10 +45,10 @@ export const fsApi = {
     document.body.removeChild(a)
   },
 
-  upload: (prefix: string, file: File, onProgress?: (pct: number) => void): Promise<{ ok: boolean }> => {
+  upload: (prefix: string, file: File, onProgress?: (pct: number) => void, relativePath?: string): Promise<{ ok: boolean }> => {
     return new Promise(async (resolve, reject) => {
       try {
-        const key = prefix + file.name
+        const key = relativePath ? prefix + relativePath : prefix + file.name
         const { url } = await apiFetch<{ url: string }>('/api/fs/upload-url', {
           method: 'POST',
           body: JSON.stringify({ key, content_type: file.type || 'application/octet-stream' }),

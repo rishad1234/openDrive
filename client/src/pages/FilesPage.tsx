@@ -36,7 +36,7 @@ import { notifications } from '@mantine/notifications'
 import { fsApi, type FsEntry } from '../api/fs'
 import { adminApi } from '../api/admin'
 import { useAuthStore } from '../store/auth'
-import { useFilesUpload } from '../components/FilesLayout'
+import { useFilesUpload, type FileWithPath } from '../components/FilesLayout'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -380,7 +380,7 @@ function BulkDeleteConfirm({
 export function FilesPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'admin'
-  const { currentPrefix, userRoot, handleUpload, uploadState } = useFilesUpload()
+  const { currentPrefix, userRoot, handleUpload, handleFolderUpload, uploadState } = useFilesUpload()
   const { '*': pathParam = '' } = useParams()
   const qc = useQueryClient()
 
@@ -406,6 +406,7 @@ export function FilesPage() {
   const [renaming, setRenaming] = useState<FsEntry | null>(null)
   const [deleting, setDeleting] = useState<{ key: string; name: string; isFolder: boolean } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
 
   // ── selection ──────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -547,12 +548,38 @@ export function FilesPage() {
           >
             Upload
           </Button>
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconUpload size={14} />}
+            loading={!!uploadState}
+            onClick={() => folderInputRef.current?.click()}
+          >
+            Upload folder
+          </Button>
           <input
             ref={fileInputRef}
             type="file"
             multiple
             style={{ display: 'none' }}
             onChange={(e) => handleUpload(Array.from(e.target.files ?? []))}
+            onClick={(e) => { (e.target as HTMLInputElement).value = '' }}
+          />
+          <input
+            ref={folderInputRef}
+            type="file"
+            // @ts-expect-error webkitdirectory is non-standard but widely supported
+            webkitdirectory=""
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              const entries: FileWithPath[] = files.map((f) => ({
+                file: f,
+                relativePath: (f as any).webkitRelativePath || f.name,
+              }))
+              handleFolderUpload(entries)
+            }}
             onClick={(e) => { (e.target as HTMLInputElement).value = '' }}
           />
         </Group>
