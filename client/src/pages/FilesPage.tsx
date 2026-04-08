@@ -98,7 +98,7 @@ function HoverRow({ children, actions, checked, hasSelection, onCheck }: {
       </Table.Td>
       {children}
       <Table.Td>
-        <Group gap={4} justify="flex-end" wrap="nowrap" style={{ opacity: hovered ? 1 : 0, transition: 'opacity 140ms ease' }}>
+        <Group gap={4} justify="flex-end" wrap="nowrap">
           {actions}
         </Group>
       </Table.Td>
