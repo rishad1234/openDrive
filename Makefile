@@ -1,4 +1,4 @@
-.PHONY: dev server client deploy deploy-api deploy-ui
+.PHONY: dev dev-remote server client deploy deploy-api deploy-ui
 
 dev:
 	@trap 'kill 0' INT; \
@@ -11,6 +11,9 @@ server:
 
 client:
 	cd client && npm run dev
+
+dev-remote:
+	cd client && VITE_API_URL=$(VITE_API_URL) npm run dev
 
 deploy: deploy-api deploy-ui
 
