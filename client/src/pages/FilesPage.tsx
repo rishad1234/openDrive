@@ -19,6 +19,8 @@ import {
   ScrollArea,
   Paper,
   Progress,
+  Image,
+  CloseButton,
 } from '@mantine/core'
 import {
   IconFolder,
@@ -30,6 +32,8 @@ import {
   IconUpload,
   IconFolderOpen,
   IconRefresh,
+  IconChevronLeft,
+  IconChevronRight,
 } from '@tabler/icons-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { notifications } from '@mantine/notifications'
@@ -67,6 +71,13 @@ function fileIconColor(name: string): string {
   if (['zip','tar','gz','rar','7z','bz2'].includes(ext)) return 'orange'
   if (['js','ts','jsx','tsx','go','py','rs','java','c','cpp','h','rb','php'].includes(ext)) return 'violet'
   return 'gray'
+}
+
+const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp'])
+
+function isImage(name: string): boolean {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  return IMAGE_EXTS.has(ext)
 }
 
 // ── hover row ────────────────────────────────────────────────────────────────
@@ -375,6 +386,111 @@ function BulkDeleteConfirm({
   )
 }
 
+function ImagePreview({
+  file, imageFiles, onNavigate, onClose,
+}: { file: FsEntry | null; imageFiles: FsEntry[]; onNavigate: (f: FsEntry) => void; onClose: () => void }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const currentIdx = file ? imageFiles.findIndex((f) => f.key === file.key) : -1
+  const hasPrev = currentIdx > 0
+  const hasNext = currentIdx >= 0 && currentIdx < imageFiles.length - 1
+
+  const goPrev = useCallback(() => {
+    if (hasPrev) onNavigate(imageFiles[currentIdx - 1])
+  }, [hasPrev, currentIdx, imageFiles, onNavigate])
+
+  const goNext = useCallback(() => {
+    if (hasNext) onNavigate(imageFiles[currentIdx + 1])
+  }, [hasNext, currentIdx, imageFiles, onNavigate])
+
+  useEffect(() => {
+    if (!file) { setUrl(null); return }
+    setLoading(true)
+    setUrl(null)
+    fsApi.previewUrl(file.key).then(setUrl).finally(() => setLoading(false))
+  }, [file])
+
+  useEffect(() => {
+    if (!file) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') goPrev()
+      else if (e.key === 'ArrowRight') goNext()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [file, goPrev, goNext])
+
+  return (
+    <Modal
+      opened={!!file}
+      onClose={onClose}
+      size="xl"
+      padding={0}
+      withCloseButton={false}
+      centered
+      styles={{ body: { position: 'relative' } }}
+    >
+      {/* Header */}
+      <Group justify="space-between" px="md" py="xs" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+        <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1 }}>
+          {file?.name}
+          {file && <Text span size="xs" c="dimmed" ml="xs">{formatSize(file.size)}</Text>}
+        </Text>
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">
+            {currentIdx + 1} / {imageFiles.length}
+          </Text>
+          <CloseButton onClick={onClose} />
+        </Group>
+      </Group>
+
+      {/* Image */}
+      <Center p="md" mih={300}>
+        {loading ? (
+          <Loader size="sm" />
+        ) : url ? (
+          <Image
+            src={url}
+            alt={file?.name}
+            fit="contain"
+            mah="70vh"
+            radius="sm"
+          />
+        ) : null}
+      </Center>
+
+      {/* Nav arrows */}
+      {hasPrev && (
+        <ActionIcon
+          variant="filled"
+          color="dark"
+          radius="xl"
+          size="lg"
+          onClick={goPrev}
+          style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
+          aria-label="Previous image"
+        >
+          <IconChevronLeft size={20} />
+        </ActionIcon>
+      )}
+      {hasNext && (
+        <ActionIcon
+          variant="filled"
+          color="dark"
+          radius="xl"
+          size="lg"
+          onClick={goNext}
+          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}
+          aria-label="Next image"
+        >
+          <IconChevronRight size={20} />
+        </ActionIcon>
+      )}
+    </Modal>
+  )
+}
+
 // ── main page ────────────────────────────────────────────────────────────────
 
 export function FilesPage() {
@@ -405,6 +521,7 @@ export function FilesPage() {
   const [newFolderOpen, setNewFolderOpen] = useState(false)
   const [renaming, setRenaming] = useState<FsEntry | null>(null)
   const [deleting, setDeleting] = useState<{ key: string; name: string; isFolder: boolean } | null>(null)
+  const [previewing, setPreviewing] = useState<FsEntry | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -425,6 +542,11 @@ export function FilesPage() {
   }, [data])
 
   const hasSelection = selected.size > 0
+
+  const imageFiles = useMemo(() =>
+    (data?.files ?? []).filter((f) => isImage(f.name)),
+    [data],
+  )
 
   const toggleSelect = useCallback((key: string, e: React.MouseEvent) => {
     setSelected((prev) => {
@@ -719,7 +841,19 @@ export function FilesPage() {
                   <Table.Td>
                     <Group gap="xs" wrap="nowrap">
                       <IconFile size={16} style={{ color: `var(--mantine-color-${fileIconColor(file.name)}-5)`, flexShrink: 0 }} />
-                      <Text size="sm">{file.name}</Text>
+                      {isImage(file.name) ? (
+                        <Anchor
+                          size="sm"
+                          onClick={() => setPreviewing(file)}
+                          style={{ cursor: 'pointer' }}
+                          underline="never"
+                          c="inherit"
+                        >
+                          {file.name}
+                        </Anchor>
+                      ) : (
+                        <Text size="sm">{file.name}</Text>
+                      )}
                     </Group>
                   </Table.Td>
                   <Table.Td><Text size="sm">{formatSize(file.size)}</Text></Table.Td>
@@ -743,6 +877,12 @@ export function FilesPage() {
         items={bulkDeleting}
         onClose={() => { setBulkDeleting([]); setSelected(new Set()) }}
         isAdmin={isAdmin}
+      />
+      <ImagePreview
+        file={previewing}
+        imageFiles={imageFiles}
+        onNavigate={setPreviewing}
+        onClose={() => setPreviewing(null)}
       />
     </>
   )

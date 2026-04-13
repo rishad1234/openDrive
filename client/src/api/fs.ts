@@ -45,6 +45,13 @@ export const fsApi = {
     document.body.removeChild(a)
   },
 
+  previewUrl: async (key: string): Promise<string> => {
+    const { url } = await apiFetch<{ url: string }>(
+      `/api/fs/download-url?key=${encodeURIComponent(key)}`,
+    )
+    return url
+  },
+
   upload: (prefix: string, file: File, onProgress?: (pct: number) => void, relativePath?: string): Promise<{ ok: boolean }> => {
     return new Promise(async (resolve, reject) => {
       try {
