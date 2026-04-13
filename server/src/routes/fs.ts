@@ -85,7 +85,8 @@ fsRoutes.get('/download-url', async (c) => {
   if (resolved === null) return c.text('forbidden', 403)
 
   const r2 = createR2Client(c.env)
-  const url = await getDownloadUrl(r2, c.env, resolved)
+  const inline = c.req.query('inline') === '1'
+  const url = await getDownloadUrl(r2, c.env, resolved, 600, inline)
   return c.json({ url })
 })
 

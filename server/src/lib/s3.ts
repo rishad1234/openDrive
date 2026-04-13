@@ -38,9 +38,14 @@ export async function getDownloadUrl(
   env: Env,
   key: string,
   expiresIn = 600,
+  inline = false,
 ): Promise<string> {
   const url = new URL(`${bucketUrl(env)}/${key}`)
   url.searchParams.set('X-Amz-Expires', String(expiresIn))
+  if (!inline) {
+    const filename = key.split('/').pop() ?? 'download'
+    url.searchParams.set('response-content-disposition', `attachment; filename="${filename}"`)
+  }
   const signed = await client.sign(url.toString(), {
     method: 'GET',
     aws: { signQuery: true },

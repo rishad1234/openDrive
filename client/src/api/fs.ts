@@ -47,7 +47,7 @@ export const fsApi = {
 
   previewUrl: async (key: string): Promise<string> => {
     const { url } = await apiFetch<{ url: string }>(
-      `/api/fs/download-url?key=${encodeURIComponent(key)}`,
+      `/api/fs/download-url?key=${encodeURIComponent(key)}&inline=1`,
     )
     return url
   },
