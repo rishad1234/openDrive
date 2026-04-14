@@ -11,6 +11,7 @@ import type { Claims } from './middleware/auth'
 export type Env = {
   DB: D1Database
   JWT_SECRET: string
+  ALLOWED_ORIGIN: string
   R2_ENDPOINT: string
   R2_ACCESS_KEY_ID: string
   R2_SECRET_ACCESS_KEY: string
@@ -25,12 +26,14 @@ export type AppVars = {
 const app = new Hono<{ Bindings: Env; Variables: AppVars }>()
 
 app.use('*', logger())
-app.use('*', cors({
-  origin: (origin) => origin,
-  allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Accept', 'Authorization', 'Content-Type'],
-  credentials: true,
-}))
+app.use('*', (c, next) => {
+  return cors({
+    origin: c.env.ALLOWED_ORIGIN,
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Accept', 'Authorization', 'Content-Type'],
+    credentials: true,
+  })(c, next)
+})
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
