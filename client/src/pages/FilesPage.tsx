@@ -80,6 +80,10 @@ function isImage(name: string): boolean {
   return IMAGE_EXTS.has(ext)
 }
 
+function isPdf(name: string): boolean {
+  return name.split('.').pop()?.toLowerCase() === 'pdf'
+}
+
 // ── hover row ────────────────────────────────────────────────────────────────
 
 function HoverRow({ children, actions, checked, hasSelection, onCheck }: {
@@ -845,6 +849,19 @@ export function FilesPage() {
                         <Anchor
                           size="sm"
                           onClick={() => setPreviewing(file)}
+                          style={{ cursor: 'pointer' }}
+                          underline="never"
+                          c="inherit"
+                        >
+                          {file.name}
+                        </Anchor>
+                      ) : isPdf(file.name) ? (
+                        <Anchor
+                          size="sm"
+                          onClick={async () => {
+                            const url = await fsApi.previewUrl(file.key)
+                            window.open(url, '_blank')
+                          }}
                           style={{ cursor: 'pointer' }}
                           underline="never"
                           c="inherit"
