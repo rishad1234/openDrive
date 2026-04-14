@@ -18,10 +18,10 @@ import {
 import { IconTrash, IconEdit, IconPlus } from '@tabler/icons-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { notifications } from '@mantine/notifications'
-import { adminApi, type CreateUserRequest, type UpdateUserRequest } from '../api/admin'
-import type { AuthUser } from '../store/auth'
+import { adminApi } from '../api/admin'
+import type { AuthUser, CreateUserRequest, UpdateUserRequest } from '@common/types/user'
 import { useAuthStore } from '../store/auth'
-import { validatePassword } from '../utils/password'
+import { validatePassword } from '@common/validation/password'
 
 interface UserFormValues {
   username: string

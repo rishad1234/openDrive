@@ -1,19 +1,5 @@
 import { apiFetch } from './client'
-import type { AuthUser } from '../store/auth'
-
-export interface CreateUserRequest {
-  username: string
-  password: string
-  role: 'user' | 'admin'
-  email?: string
-}
-
-export interface UpdateUserRequest {
-  username?: string
-  password?: string
-  role?: 'user' | 'admin'
-  email?: string
-}
+import type { AuthUser, CreateUserRequest, UpdateUserRequest } from '@common/types/user'
 
 export const adminApi = {
   listUsers: () => apiFetch<AuthUser[]>('/api/admin/users'),

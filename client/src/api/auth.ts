@@ -1,9 +1,5 @@
 import { apiFetch } from './client'
-import type { AuthUser } from '../store/auth'
-
-export interface LoginResponse {
-  token: string
-}
+import type { AuthUser, LoginResponse, UpdateProfileRequest } from '@common/types/user'
 
 export const authApi = {
   login: (username: string, password: string) =>
@@ -17,7 +13,7 @@ export const authApi = {
 
   logout: () => apiFetch<void>('/api/auth/logout', { method: 'POST' }),
 
-  updateProfile: (data: { username?: string; current_password?: string; password?: string; email?: string | null }) =>
+  updateProfile: (data: UpdateProfileRequest) =>
     apiFetch<AuthUser>('/api/user/profile', {
       method: 'PATCH',
       body: JSON.stringify(data),

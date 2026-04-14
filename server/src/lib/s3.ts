@@ -1,5 +1,6 @@
 import { AwsClient } from 'aws4fetch'
 import type { Env } from '../index'
+import type { FsEntry, ListResponse } from '@common/types/fs'
 
 export function createR2Client(env: Env): AwsClient {
   return new AwsClient({
@@ -55,16 +56,11 @@ export async function getDownloadUrl(
 
 // ---- List ----
 
-export interface ListResult {
-  folders: string[]
-  files: { key: string; name: string; size: number; last_modified: string }[]
-}
-
 export async function listObjects(
   client: AwsClient,
   env: Env,
   prefix: string,
-): Promise<ListResult> {
+): Promise<ListResponse> {
   const url = new URL(bucketUrl(env))
   url.searchParams.set('list-type', '2')
   url.searchParams.set('prefix', prefix)
@@ -82,7 +78,7 @@ export async function listObjects(
   }
 
   // Parse files (Contents)
-  const files: ListResult['files'] = []
+  const files: FsEntry[] = []
   const contentsRegex = /<Contents>([\s\S]*?)<\/Contents>/g
   while ((match = contentsRegex.exec(xml)) !== null) {
     const block = match[1]

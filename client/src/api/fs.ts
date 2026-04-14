@@ -1,16 +1,5 @@
 import { apiFetch } from './client'
-
-export interface FsEntry {
-  key: string
-  name: string
-  size: number
-  last_modified: string
-}
-
-export interface ListResponse {
-  folders: string[]
-  files: FsEntry[]
-}
+import type { ListResponse } from '@common/types/fs'
 
 export const fsApi = {
   list: (prefix: string) =>

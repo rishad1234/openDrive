@@ -16,7 +16,8 @@ import { notifications } from '@mantine/notifications'
 import { useMutation } from '@tanstack/react-query'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../store/auth'
-import { validatePassword } from '../utils/password'
+import { validatePassword } from '@common/validation/password'
+import type { UpdateProfileRequest } from '@common/types/user'
 
 export function ProfilePage() {
   const { user, setAuth } = useAuthStore()
@@ -35,7 +36,7 @@ export function ProfilePage() {
   }, [user])
 
   const mutation = useMutation({
-    mutationFn: (data: { username?: string; current_password?: string; password?: string; email?: string | null }) =>
+    mutationFn: (data: UpdateProfileRequest) =>
       authApi.updateProfile(data),
     onSuccess: (updated) => {
       setAuth(token, updated)
@@ -66,7 +67,7 @@ export function ProfilePage() {
       return
     }
 
-    const payload: { username?: string; current_password?: string; password?: string; email?: string | null } = {}
+    const payload: UpdateProfileRequest = {}
 
     if (username && username !== user?.username) payload.username = username
     if (email !== (user?.email ?? '')) payload.email = email || null

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { SignJWT } from 'jose'
 import bcrypt from 'bcryptjs'
 import type { Env, AppVars } from '../index'
+import type { LoginRequest } from '@common/types/user'
 import { auth, getClaims } from '../middleware/auth'
 import * as users from '../db/users'
 import * as tokens from '../db/tokens'
@@ -10,7 +11,7 @@ const authRoutes = new Hono<{ Bindings: Env; Variables: AppVars }>()
 
 // POST /api/auth/login — public, no middleware
 authRoutes.post('/login', async (c) => {
-  const body = await c.req.json<{ username?: string; password?: string }>()
+  const body = await c.req.json<LoginRequest>()
   if (!body.username || !body.password) {
     return c.text('username and password required', 400)
   }
