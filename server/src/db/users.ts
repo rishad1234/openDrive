@@ -53,6 +53,18 @@ export async function create(
   return { id, username, role, email }
 }
 
+interface UpdateFields {
+  password?: string | null
+  role?: Role | null
+  email?: string | null
+}
+
+interface UpdateSelfFields {
+  username?: string | null
+  password?: string | null
+  email?: string | null
+}
+
 export async function update(
   db: D1Database,
   id: string,
@@ -60,21 +72,7 @@ export async function update(
   role: Role | null,
   email: string | null | undefined,
 ): Promise<void> {
-  const batch: D1PreparedStatement[] = []
-
-  if (hashedPassword) {
-    batch.push(db.prepare('UPDATE users SET password = ? WHERE id = ?').bind(hashedPassword, id))
-  }
-  if (role) {
-    batch.push(db.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, id))
-  }
-  if (email !== undefined) {
-    batch.push(db.prepare('UPDATE users SET email = ? WHERE id = ?').bind(email, id))
-  }
-
-  if (batch.length > 0) {
-    await db.batch(batch)
-  }
+  await applyUpdates(db, id, { password: hashedPassword, role, email })
 }
 
 export async function updateSelf(
@@ -84,16 +82,20 @@ export async function updateSelf(
   hashedPassword: string | null,
   email: string | null | undefined,
 ): Promise<void> {
+  await applyUpdates(db, id, { username, password: hashedPassword, email })
+}
+
+async function applyUpdates(
+  db: D1Database,
+  id: string,
+  fields: UpdateFields | UpdateSelfFields,
+): Promise<void> {
   const batch: D1PreparedStatement[] = []
 
-  if (username) {
-    batch.push(db.prepare('UPDATE users SET username = ? WHERE id = ?').bind(username, id))
-  }
-  if (hashedPassword) {
-    batch.push(db.prepare('UPDATE users SET password = ? WHERE id = ?').bind(hashedPassword, id))
-  }
-  if (email !== undefined) {
-    batch.push(db.prepare('UPDATE users SET email = ? WHERE id = ?').bind(email, id))
+  for (const [column, value] of Object.entries(fields)) {
+    if (value === undefined) continue
+    if (value === null && column !== 'email') continue
+    batch.push(db.prepare(`UPDATE users SET ${column} = ? WHERE id = ?`).bind(value, id))
   }
 
   if (batch.length > 0) {
