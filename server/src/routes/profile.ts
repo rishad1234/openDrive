@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs'
 import type { Env, AppVars } from '../index'
 import { auth, getClaims } from '../middleware/auth'
 import { validatePassword } from '@common/validation/password'
+import { validateUsername } from '@common/validation/username'
+import { validateEmail } from '@common/validation/email'
 import * as users from '../db/users'
 
 const profileRoutes = new Hono<{ Bindings: Env; Variables: AppVars }>()
@@ -16,6 +18,13 @@ profileRoutes.patch('/profile', auth, async (c) => {
     password?: string
     email?: string | null
   }>()
+
+  if (body.username) {
+    const unError = validateUsername(body.username)
+    if (unError) {
+      return c.text(unError, 400)
+    }
+  }
 
   let hashed: string | null = null
 
@@ -42,7 +51,12 @@ profileRoutes.patch('/profile', auth, async (c) => {
     hashed = await bcrypt.hash(body.password, 10)
   }
 
-  const email = body.email !== undefined ? (body.email ?? null) : undefined
+  const email = body.email !== undefined ? (body.email || null) : undefined
+  const emailError = validateEmail(email)
+  if (emailError) {
+    return c.text(emailError, 400)
+  }
+
   await users.updateSelf(c.env.DB, claims.user_id, body.username ?? null, hashed, email)
 
   const user = await users.getByID(c.env.DB, claims.user_id)

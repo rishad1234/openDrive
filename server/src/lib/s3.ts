@@ -45,7 +45,7 @@ export async function getDownloadUrl(
   url.searchParams.set('X-Amz-Expires', String(expiresIn))
   if (!inline) {
     const filename = key.split('/').pop() ?? 'download'
-    url.searchParams.set('response-content-disposition', `attachment; filename="${filename}"`)
+    url.searchParams.set('response-content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`)
   }
   const signed = await client.sign(url.toString(), {
     method: 'GET',

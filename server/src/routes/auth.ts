@@ -16,13 +16,13 @@ authRoutes.post('/login', async (c) => {
     return c.text('username and password required', 400)
   }
 
-  const user = await users.getByUsername(c.env.DB, body.username)
-  if (!user) {
-    return c.text('invalid credentials', 401)
-  }
+  // Dummy hash used when user not found — ensures constant-time response
+  // regardless of whether the username exists, preventing enumeration via timing.
+  const DUMMY_HASH = '$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012345'
 
-  const valid = await bcrypt.compare(body.password, user.password)
-  if (!valid) {
+  const user = await users.getByUsername(c.env.DB, body.username)
+  const valid = await bcrypt.compare(body.password, user?.password ?? DUMMY_HASH)
+  if (!user || !valid) {
     return c.text('invalid credentials', 401)
   }
 

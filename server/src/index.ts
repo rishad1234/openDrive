@@ -35,6 +35,15 @@ app.use('*', (c, next) => {
   })(c, next)
 })
 
+app.use('*', (c, next) => {
+  c.header('X-Content-Type-Options', 'nosniff')
+  c.header('X-Frame-Options', 'DENY')
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
+  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  c.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'")
+  return next()
+})
+
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 

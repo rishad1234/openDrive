@@ -17,6 +17,7 @@ import { useMutation } from '@tanstack/react-query'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../store/auth'
 import { validatePassword } from '@common/validation/password'
+import { validateEmail } from '@common/validation/email'
 import type { UpdateProfileRequest } from '@common/types/user'
 
 export function ProfilePage() {
@@ -29,6 +30,7 @@ export function ProfilePage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const newPasswordError = newPassword ? validatePassword(newPassword) : null
+  const emailError = email ? validateEmail(email) : null
 
   useEffect(() => {
     setUsername(user?.username ?? '')
@@ -59,6 +61,11 @@ export function ProfilePage() {
 
     if (newPassword && newPasswordError) {
       notifications.show({ color: 'red', message: newPasswordError })
+      return
+    }
+
+    if (emailError) {
+      notifications.show({ color: 'red', message: emailError })
       return
     }
 
@@ -107,6 +114,7 @@ export function ProfilePage() {
             placeholder="optional"
             value={email}
             onChange={(e) => setEmail(e.currentTarget.value)}
+            error={emailError}
           />
 
           <Divider label="Change password" labelPosition="left" mt="xs" />

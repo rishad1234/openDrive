@@ -1,3 +1,5 @@
 export * from './types/user'
 export * from './types/fs'
 export * from './validation/password'
+export * from './validation/username'
+export * from './validation/email'

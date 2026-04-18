@@ -22,6 +22,7 @@ import { adminApi } from '../api/admin'
 import type { AuthUser, CreateUserRequest, UpdateUserRequest } from '@common/types/user'
 import { useAuthStore } from '../store/auth'
 import { validatePassword } from '@common/validation/password'
+import { validateEmail } from '@common/validation/email'
 
 interface UserFormValues {
   username: string
@@ -51,6 +52,7 @@ function UserModal({
 
   const isEdit = editing !== null
   const pwError = form.password ? validatePassword(form.password) : null
+  const emailError = form.email ? validateEmail(form.email) : null
 
   useEffect(() => {
     if (!opened) return
@@ -92,6 +94,7 @@ function UserModal({
       if (form.password) {
         if (pwError) return
       }
+      if (emailError) return
       const payload: UpdateUserRequest = { role: form.role }
       if (form.password) payload.password = form.password
       if (form.email) payload.email = form.email
@@ -99,6 +102,7 @@ function UserModal({
     } else {
       const err = validatePassword(form.password)
       if (err) return
+      if (emailError) return
       const payload: CreateUserRequest = {
         username: form.username,
         password: form.password,
@@ -154,6 +158,7 @@ function UserModal({
             placeholder="optional"
             value={form.email}
             onChange={(e) => set('email')(e.currentTarget.value)}
+            error={emailError}
           />
           <Button type="submit" loading={loading} mt="xs">
             {isEdit ? 'Save changes' : 'Create user'}

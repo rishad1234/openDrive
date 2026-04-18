@@ -85,6 +85,8 @@ export async function updateSelf(
   await applyUpdates(db, id, { username, password: hashedPassword, email })
 }
 
+const ALLOWED_UPDATE_COLUMNS = new Set(['username', 'password', 'role', 'email'])
+
 async function applyUpdates(
   db: D1Database,
   id: string,
@@ -93,6 +95,7 @@ async function applyUpdates(
   const batch: D1PreparedStatement[] = []
 
   for (const [column, value] of Object.entries(fields)) {
+    if (!ALLOWED_UPDATE_COLUMNS.has(column)) throw new Error(`Disallowed column: ${column}`)
     if (value === undefined) continue
     if (value === null && column !== 'email') continue
     batch.push(db.prepare(`UPDATE users SET ${column} = ? WHERE id = ?`).bind(value, id))

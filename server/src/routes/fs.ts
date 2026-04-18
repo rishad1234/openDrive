@@ -18,6 +18,10 @@ fsRoutes.use('*', auth)
 // ---------- helpers ----------
 
 function userPrefix(role: string, userId: string, requested: string): string | null {
+  // Reject any path traversal attempts before access control checks.
+  // R2 normalizes '..' segments server-side, so 'users/a/../../b' reaches 'users/b'.
+  if (requested.includes('..')) return null
+
   const base = `users/${userId}/`
 
   if (role === 'admin') {
